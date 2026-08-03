@@ -1122,7 +1122,7 @@ async function callOpenAI(messages,system,images){
   }
   const model=settings.model||DEFAULT_MODELS.openai;
   const body={model,max_completion_tokens:4096,messages:msgs};
-  if(/^(gpt-5|o\d)/.test(model)) body.reasoning_effort='minimal';
+  if(/^(gpt-5|o\d)/.test(model)) body.reasoning_effort='none'; // เร็วสุดของรุ่นนี้
   const doFetch=(bd)=>fetch('https://api.openai.com/v1/chat/completions',{
     method:'POST',
     headers:{'content-type':'application/json','authorization':'Bearer '+settings.key},
