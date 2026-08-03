@@ -346,7 +346,7 @@
           <select id="setVoice" style="flex:1"></select>
           <button class="btn" style="width:auto; padding:12px 16px; margin:0" onclick="saveVoice()">บันทึก/ลองฟัง</button>
         </div>
-        <div class="hint" style="margin-top:8px">ค่าเริ่มต้นเลือกเสียงผู้หญิงไทยอัตโนมัติ — รายชื่อเสียงขึ้นกับแต่ละเครื่อง</div>
+        <div class="hint" style="margin-top:8px">ค่าเริ่มต้น: เสียงผู้หญิง AI (Nova) เหมือนกันทุกเครื่อง — เสียง AI ใช้เครดิต OpenAI เล็กน้อยต่อการพูด ถ้าออฟไลน์จะสลับไปเสียงในเครื่องให้เอง</div>
       </div>
       <div class="card">
         <div class="sec-title" style="margin-top:0">🎨 ธีม</div>
@@ -784,7 +784,7 @@ function switchView(v){
   const scroll=$('mainScroll');
   if(v==='chat'){ scroll.style.display='none'; $('chatView').classList.add('active'); $('fab').style.display='none'; renderChat(); updateSpkBtn(); }
   else{
-    if(typeof stopMic==='function'){ stopMic(true); if('speechSynthesis' in window) speechSynthesis.cancel(); }
+    if(typeof stopMic==='function'){ stopMic(true); try{ stopSpeaking(); }catch(e){} }
     scroll.style.display='block'; $('fab').style.display='flex';
     $((v==='home'?'home':v==='list'?'list':v==='slip'?'slip':v==='set'?'set':'home')+'View').classList.add('active');
     scroll.scrollTop=0;
@@ -1350,45 +1350,72 @@ function cleanForSpeech(t){
 function thaiVoices(){
   try{ return speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.toLowerCase().startsWith('th')); }catch(e){ return []; }
 }
-function pickVoice(){
-  const vs=thaiVoices();
-  if(!vs.length) return null;
-  // ผู้ใช้เลือกเองไว้
-  if(settings.voiceName){ const m=vs.find(v=>v.name===settings.voiceName); if(m) return m; }
-  // อัตโนมัติ: เลือกเสียงผู้หญิงก่อน
-  const female=/premwadee|achara|kanya|pattara|female|หญิง/i;
-  const male=/niwat|male|ชาย/i;
-  return vs.find(v=>female.test(v.name)) || vs.find(v=>!male.test(v.name)) || vs[0];
-}
+const AI_VOICES=[['nova','✨ AI: Nova — หญิง สดใส (แนะนำ)'],['shimmer','✨ AI: Shimmer — หญิง นุ่มนวล'],['coral','✨ AI: Coral — หญิง อบอุ่น'],['alloy','✨ AI: Alloy — เสียงกลาง'],['onyx','✨ AI: Onyx — ชาย']];
+function voiceChoice(){ return settings.voiceName || 'ai:nova'; }
 function populateVoiceSelect(){
   const sel=document.getElementById('setVoice'); if(!sel) return;
-  const vs=thaiVoices();
-  sel.innerHTML='<option value="">อัตโนมัติ (เสียงผู้หญิง)</option>'+vs.map(v=>`<option value="${escapeHtml(v.name)}">${escapeHtml(v.name)}</option>`).join('');
-  sel.value=settings.voiceName||'';
+  let html='';
+  AI_VOICES.forEach(([id,label])=>{ html+=`<option value="ai:${id}">${label}</option>`; });
+  thaiVoices().forEach(v=>{ html+=`<option value="dev:${escapeHtml(v.name)}">📱 ในเครื่อง: ${escapeHtml(v.name)}</option>`; });
+  sel.innerHTML=html;
+  sel.value=voiceChoice();
+  if(sel.value==='') sel.value='ai:nova';
 }
 function saveVoice(){
   settings.voiceName=document.getElementById('setVoice').value;
   store.set('jd_settings',settings);
-  const u=new SpeechSynthesisUtterance('สวัสดีค่ะ ฉันคือผู้ช่วยจงจด');
-  u.lang='th-TH'; const v=pickVoice(); if(v)u.voice=v; u.pitch=1.05;
-  try{ speechSynthesis.cancel(); speechSynthesis.speak(u); }catch(e){}
+  speakReply('สวัสดีค่ะ ฉันคือผู้ช่วยจงจด ยินดีให้บริการค่ะ');
   toast('บันทึกเสียงผู้ช่วยแล้ว ✓');
 }
-function speakReply(text){
+let currentAudio=null;
+function stopSpeaking(){
+  try{ if(currentAudio){ currentAudio.pause(); currentAudio=null; } }catch(e){}
+  try{ if('speechSynthesis' in window) speechSynthesis.cancel(); }catch(e){}
+}
+function deviceSpeak(t,name){
   return new Promise(res=>{
-    if(!voiceReplyOn() || !('speechSynthesis' in window)){ res(); return; }
-    const t=cleanForSpeech(text);
-    if(!t){ res(); return; }
+    if(!('speechSynthesis' in window)){ res(); return; }
     try{
       speechSynthesis.cancel();
       const u=new SpeechSynthesisUtterance(t);
       u.lang='th-TH';
-      const v=pickVoice(); if(v) u.voice=v;
-      u.rate=1; u.pitch=1.05; u.onend=()=>res(); u.onerror=()=>res();
+      const vs=thaiVoices();
+      const v=(name&&vs.find(x=>x.name===name))||vs[0];
+      if(v) u.voice=v;
+      u.rate=1; u.pitch=1.1; u.onend=()=>res(); u.onerror=()=>res();
       speechSynthesis.speak(u);
       setTimeout(res, Math.min(20000, 2000+t.length*120));
     }catch(e){ res(); }
   });
+}
+async function aiSpeak(t,voice){
+  const res=await fetch('https://api.openai.com/v1/audio/speech',{
+    method:'POST',
+    headers:{'content-type':'application/json','authorization':'Bearer '+settings.key},
+    body:JSON.stringify({model:'gpt-4o-mini-tts',voice:voice||'nova',input:t,response_format:'mp3'})
+  });
+  if(!res.ok) throw new Error('tts http '+res.status);
+  const blob=await res.blob();
+  return new Promise(done=>{
+    const a=new Audio(URL.createObjectURL(blob));
+    currentAudio=a;
+    a.onended=()=>{ currentAudio=null; done(); };
+    a.onerror=()=>{ currentAudio=null; done(); };
+    a.play().catch(()=>done());
+    setTimeout(()=>{ done(); }, Math.min(30000, 3000+t.length*150));
+  });
+}
+async function speakReply(text){
+  if(!voiceReplyOn()) return;
+  const t=cleanForSpeech(text);
+  if(!t) return;
+  const choice=voiceChoice();
+  if(choice.startsWith('dev:')) return deviceSpeak(t, choice.slice(4));
+  // เสียง AI (ต้องมี key + ออนไลน์) — พลาดเมื่อไหร่ตกลงเสียงในเครื่อง
+  if(hasKey()){
+    try{ return await aiSpeak(t, choice.startsWith('ai:')?choice.slice(3):'nova'); }catch(e){}
+  }
+  return deviceSpeak(t, null);
 }
 if('speechSynthesis' in window){ speechSynthesis.onvoiceschanged=()=>{ try{ populateVoiceSelect(); }catch(e){} }; }
 async function afterReplySpoken(reply){
