@@ -1613,8 +1613,10 @@ function iconDataURI(size){ return APP_ICONS[size]||APP_ICONS[192]; }
 (function(){
   const manifest={name:'จงจด — รายรับรายจ่าย',short_name:'จงจด',start_url:'.',display:'standalone',background_color:'#f7f7f5',theme_color:'#f7f7f5',
     icons:[{src:iconDataURI(192),sizes:'192x192',type:'image/png'},{src:iconDataURI(512),sizes:'512x512',type:'image/png'}]};
-  const mBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
-  const link=document.createElement('link'); link.rel='manifest'; link.href=URL.createObjectURL(mBlob); document.head.appendChild(link);
+  const link=document.createElement('link'); link.rel='manifest';
+  if(/^https?:$/.test(location.protocol)){ link.href='./manifest.json'; }
+  else{ const mBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'}); link.href=URL.createObjectURL(mBlob); }
+  document.head.appendChild(link);
   const al=document.createElement('link'); al.rel='apple-touch-icon'; al.href=iconDataURI(180); document.head.appendChild(al);
   const fav=document.createElement('link'); fav.rel='icon'; fav.href=iconDataURI(192); document.head.appendChild(fav);
   const bl=document.getElementById('brandLogo'); if(bl) bl.src=iconDataURI(192);
