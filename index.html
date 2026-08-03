@@ -341,6 +341,14 @@
       </div>
 
       <div class="card">
+        <div class="sec-title" style="margin-top:0">🗣️ เสียงผู้ช่วย (ตอนคุยด้วยเสียง)</div>
+        <div style="display:flex; gap:8px">
+          <select id="setVoice" style="flex:1"></select>
+          <button class="btn" style="width:auto; padding:12px 16px; margin:0" onclick="saveVoice()">บันทึก/ลองฟัง</button>
+        </div>
+        <div class="hint" style="margin-top:8px">ค่าเริ่มต้นเลือกเสียงผู้หญิงไทยอัตโนมัติ — รายชื่อเสียงขึ้นกับแต่ละเครื่อง</div>
+      </div>
+      <div class="card">
         <div class="sec-title" style="margin-top:0">🎨 ธีม</div>
         <div class="theme-toggle">
           <button id="thmLight" onclick="setTheme('light')">☀️ สว่าง</button>
@@ -785,7 +793,7 @@ function switchView(v){
   const subs={home:'รายรับรายจ่ายของฉัน',list:'รายการทั้งหมด',slip:'อ่านสลิปด้วย AI',chat:'ผู้ช่วยจงจด',set:'ตั้งค่า'};
   $('topSub').textContent=subs[v]||'';
   if(v==='slip')updateSlipHint();
-  if(v==='set'){ loadSettingsForm(); try{ updateCloudUI(); renderRecurList(); updatePinUI(); }catch(e){} }
+  if(v==='set'){ loadSettingsForm(); try{ updateCloudUI(); renderRecurList(); updatePinUI(); populateVoiceSelect(); }catch(e){} }
 }
 function openStats(){
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
@@ -1339,6 +1347,33 @@ function startListening(){
 function cleanForSpeech(t){
   return (t||'').replace(/[\u{1F300}-\u{1FAFF}\u{2190}-\u{2BFF}\u{FE0F}]/gu,'').replace(/[#*_`]/g,'').trim();
 }
+function thaiVoices(){
+  try{ return speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.toLowerCase().startsWith('th')); }catch(e){ return []; }
+}
+function pickVoice(){
+  const vs=thaiVoices();
+  if(!vs.length) return null;
+  // ผู้ใช้เลือกเองไว้
+  if(settings.voiceName){ const m=vs.find(v=>v.name===settings.voiceName); if(m) return m; }
+  // อัตโนมัติ: เลือกเสียงผู้หญิงก่อน
+  const female=/premwadee|achara|kanya|pattara|female|หญิง/i;
+  const male=/niwat|male|ชาย/i;
+  return vs.find(v=>female.test(v.name)) || vs.find(v=>!male.test(v.name)) || vs[0];
+}
+function populateVoiceSelect(){
+  const sel=document.getElementById('setVoice'); if(!sel) return;
+  const vs=thaiVoices();
+  sel.innerHTML='<option value="">อัตโนมัติ (เสียงผู้หญิง)</option>'+vs.map(v=>`<option value="${escapeHtml(v.name)}">${escapeHtml(v.name)}</option>`).join('');
+  sel.value=settings.voiceName||'';
+}
+function saveVoice(){
+  settings.voiceName=document.getElementById('setVoice').value;
+  store.set('jd_settings',settings);
+  const u=new SpeechSynthesisUtterance('สวัสดีค่ะ ฉันคือผู้ช่วยจงจด');
+  u.lang='th-TH'; const v=pickVoice(); if(v)u.voice=v; u.pitch=1.05;
+  try{ speechSynthesis.cancel(); speechSynthesis.speak(u); }catch(e){}
+  toast('บันทึกเสียงผู้ช่วยแล้ว ✓');
+}
 function speakReply(text){
   return new Promise(res=>{
     if(!voiceReplyOn() || !('speechSynthesis' in window)){ res(); return; }
@@ -1348,15 +1383,14 @@ function speakReply(text){
       speechSynthesis.cancel();
       const u=new SpeechSynthesisUtterance(t);
       u.lang='th-TH';
-      const th=speechSynthesis.getVoices().find(v=>v.lang&&v.lang.toLowerCase().startsWith('th'));
-      if(th) u.voice=th;
-      u.rate=1; u.onend=()=>res(); u.onerror=()=>res();
+      const v=pickVoice(); if(v) u.voice=v;
+      u.rate=1; u.pitch=1.05; u.onend=()=>res(); u.onerror=()=>res();
       speechSynthesis.speak(u);
       setTimeout(res, Math.min(20000, 2000+t.length*120));
     }catch(e){ res(); }
   });
 }
-if('speechSynthesis' in window){ speechSynthesis.onvoiceschanged=()=>{}; }
+if('speechSynthesis' in window){ speechSynthesis.onvoiceschanged=()=>{ try{ populateVoiceSelect(); }catch(e){} }; }
 async function afterReplySpoken(reply){
   const wasVoice=pendingVoice; pendingVoice=false;
   if(wasVoice) await speakReply(reply);
