@@ -549,8 +549,8 @@ let viewMonth = new Date(); viewMonth.setDate(1);
 let form = {editId:null,type:'expense',cat:'food',wallet:'cash',trMode:false};
 let pendingScanImg = null;
 
-const DEFAULT_MODELS={anthropic:'claude-sonnet-4-20250514',openai:'gpt-5.6-luna'};
-if(settings.provider==='openai' && ['gpt-5.5','gpt-4o'].includes(settings.model||'')){ settings.model=''; store.set('jd_settings',settings); }
+const DEFAULT_MODELS={anthropic:'claude-sonnet-4-20250514',openai:'gpt-5.6-terra'};
+if(settings.provider==='openai' && ['gpt-5.5','gpt-4o','gpt-5.6-luna'].includes(settings.model||'')){ settings.model=''; store.set('jd_settings',settings); }
 
 /* ================= Utils ================= */
 const $=id=>document.getElementById(id);
@@ -1130,7 +1130,7 @@ async function callOpenAI(messages,system,images){
   }
   const model=settings.model||DEFAULT_MODELS.openai;
   const body={model,max_completion_tokens:4096,messages:msgs};
-  if(/^(gpt-5|o\d)/.test(model)) body.reasoning_effort='none'; // เร็วสุดของรุ่นนี้
+  if(/^(gpt-5|o\d)/.test(model)) body.reasoning_effort='low'; // ฉลาดขึ้น ยังเร็ว
   const doFetch=(bd)=>fetch('https://api.openai.com/v1/chat/completions',{
     method:'POST',
     headers:{'content-type':'application/json','authorization':'Bearer '+settings.key},
@@ -1450,7 +1450,9 @@ function chatContext(){
   if(tb.length) budStr=' งบที่ตั้งไว้: '+tb.map(([k,v])=>catOf('expense',k).name+' ฿'+v).join(', ')+'.';
   return `ข้อมูลเดือน ${THMONTHS[viewMonth.getMonth()]} ${viewMonth.getFullYear()+543}: รายรับรวม ฿${inc}, รายจ่ายรวม ฿${exp}, คงเหลือ ฿${inc-exp}. รายจ่ายตามหมวด: ${catStr}.${budStr} วันนี้คือ ${todayStr()}`;
 }
-const CHAT_SYSTEM=()=>`คุณคือผู้ช่วยจดรายรับรายจ่ายภาษาไทยที่เป็นกันเองและกระชับ
+const CHAT_SYSTEM=()=>`คุณคือ "น้องจด" ผู้ช่วยสาวจดรายรับรายจ่ายภาษาไทย ฉลาด เป็นกันเอง และกระชับ
+บุคลิกสำคัญมาก: คุณเป็นผู้หญิง ลงท้ายประโยคด้วย "ค่ะ" หรือ "นะคะ" เสมอ ห้ามใช้ "ครับ" เด็ดขาด
+คุณเก่งเรื่องการเงิน: วิเคราะห์การใช้จ่าย เปรียบเทียบกับงบ แนะนำการออมได้ ถ้าผู้ใช้ใช้จ่ายเกินงบให้เตือนอย่างน่ารักไม่จู้จี้
 ${chatContext()}
 
 เมื่อผู้ใช้บอกค่าใช้จ่ายหรือรายรับ ให้แยกออกเป็นรายการ และตอบกลับเป็น JSON เท่านั้น รูปแบบ:
