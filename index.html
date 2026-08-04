@@ -950,7 +950,7 @@ function openAdd(type,cat,editId){
   form.type = t?(t.tr?'transfer':t.type) : (type||'expense');
   form.cat = t?t.cat : (cat || CATS[form.type==='transfer'?'expense':form.type][0].id);
   form.wallet = t?(t.wallet||'cash'):'cash';
-  pendingScanImg=null;
+  pendingScanImg=null; form.scanRef='';
   $('addTitle').textContent = t?(t.tr?'รายการโอน':'แก้ไขรายการ'):'เพิ่มรายการ';
   $('fAmount').value = t?t.amount:'';
   $('fNote').value = t?(t.note||''):'';
@@ -1064,10 +1064,14 @@ async function scanIntoForm(file){
     if(data.merchant) $('fNote').value=data.merchant;
     form.type='expense';
     form.cat=CATS.expense.find(c=>c.id===data.category)?data.category:'other';
+    form.scanRef=data.ref?String(data.ref).replace(/\s+/g,'').trim():'';
     setFormType('expense',true);
     pendingScanImg=img;
     showSlipPreview(img.url);
-    st.textContent='✓ อ่านสลิปสำเร็จ — ตรวจสอบข้อมูลแล้วกดบันทึก (รูปจะแนบกับรายการ)';
+    const dupRef = form.scanRef && txs.find(x=>x.ref===form.scanRef);
+    st.innerHTML = dupRef
+      ? '⚠️ สลิปนี้อาจซ้ำ — มีรายการเลขอ้างอิงเดียวกันอยู่แล้ว ('+fmt(dupRef.amount)+')'
+      : '✓ อ่านสลิปสำเร็จ — ตรวจสอบข้อมูลแล้วกดบันทึก (รูปจะแนบกับรายการ)';
   }catch(e){ st.textContent='✗ '+e.message; }
 }
 function saveTx(){
@@ -1092,6 +1096,7 @@ function saveTx(){
   else{
     txid=uid();
     const tx={id:txid,source:'manual',by:settings.owner||'',...data};
+    if(form.scanRef){ tx.ref=form.scanRef; }
     txs.push(tx);
     if($('fRecur').checked){
       const day=Number(date.slice(8,10));
@@ -1361,7 +1366,7 @@ function fileToBase64(file){
   });
 }
 const SLIP_PROMPT=`คุณคือผู้ช่วยอ่านสลิป/ใบเสร็จภาษาไทย จากรูปภาพนี้ ดึงข้อมูลออกมาเป็น JSON เท่านั้น รูปแบบ:
-{"type":"expense","amount":ตัวเลขจำนวนเงินรวมสุทธิ,"date":"YYYY-MM-DD","merchant":"ชื่อร้าน/ผู้รับเงิน","category":"food|drink|transport|shopping|bills|rent|home|fun|travel|health|beauty|edu|family|pet|insure|debt|donate|other"}
+{"type":"expense","amount":ตัวเลขจำนวนเงินรวมสุทธิ,"date":"YYYY-MM-DD","merchant":"ชื่อร้าน/ผู้รับเงิน","ref":"เลขที่อ้างอิง/รหัสธุรกรรมบนสลิป (Ref No./รหัสอ้างอิง) ถ้าไม่มีให้เว้นว่าง","category":"food|drink|transport|shopping|bills|rent|home|fun|travel|health|beauty|edu|family|pet|insure|debt|donate|other"}
 กติกา: amount ใช้ยอดรวมสุทธิที่จ่ายจริง (ไม่มีสัญลักษณ์เงิน), ถ้าเป็นการโอนเงินออกให้ type=expense, ถ้าอ่านวันที่ไม่ได้ให้ใช้วันนี้, เลือก category ที่ใกล้เคียงที่สุด ตอบเฉพาะ JSON`;
 
 let slipHashes=store.get('jd_sliphashes',[]);
@@ -1394,8 +1399,9 @@ async function handleSlips(files){
       const data=extractJSON(out);
       if(!data||!data.amount) throw new Error('อ่านยอดเงินไม่ได้');
       const cat=CATS.expense.find(c=>c.id===data.category)?data.category:'other';
-      const tx={id:uid(),source:'slip',type:'expense',amount:Number(data.amount),cat,note:data.merchant||'สลิป',tags:[],wallet:'cash',by:settings.owner||'',date:(data.date&&/^\d{4}-\d{2}-\d{2}$/.test(data.date))?data.date:todayStr()};
-      const dup=txs.find(x=>x.source==='slip'&&x.amount===tx.amount&&x.date===tx.date&&x.note===tx.note);
+      const ref=data.ref?String(data.ref).replace(/\s+/g,'').trim():'';
+      const tx={id:uid(),source:'slip',type:'expense',amount:Number(data.amount),cat,note:data.merchant||'สลิป',tags:[],wallet:'cash',by:settings.owner||'',ref,date:(data.date&&/^\d{4}-\d{2}-\d{2}$/.test(data.date))?data.date:todayStr()};
+      const dup=txs.find(x=>x.source==='slip' && ( (ref && x.ref && x.ref===ref) || ((!ref||!x.ref) && x.amount===tx.amount && x.date===tx.date && x.note===tx.note) ));
       if(dup){
         rememberHash(hash); skipped++;
         item.innerHTML=`<img src="${img.url}"><div class="info"><div style="font-weight:600;color:var(--muted)">ข้าม — มีรายการนี้อยู่แล้ว</div><div class="st">${escapeHtml(tx.note)} · ${fmt(tx.amount)}</div></div>`;
