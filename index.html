@@ -269,7 +269,7 @@
       <div class="drop" id="slipDrop" onclick="document.getElementById('slipInput').click()">
         <div class="di">🧾</div>
         <div style="font-weight:600;color:var(--txt);font-size:14.5px">เลือกรูปสลิปจากอัลบั้ม</div>
-        <div class="hint">เลือกทั้งอัลบั้มได้เลย — รูปที่เคยเพิ่มแล้วจะถูก<b>ข้ามอัตโนมัติ ไม่บันทึกซ้ำ</b> AI อ่านยอดเงิน วันที่ ร้านค้า และหมวดให้เอง พร้อมเก็บรูปแนบรายการไว้ดูย้อนหลัง</div>
+        <div class="hint">เลือกทั้งอัลบั้มได้เลย — รูปซ้ำถูกข้ามอัตโนมัติ ไม่บันทึกซ้ำ | อยากให้เข้าเองอัตโนมัติ? ดู "📁 สลิปเข้าอัตโนมัติ" ในตั้งค่า (คอม: เฝ้าโฟลเดอร์ / มือถือ: แชร์รูปมาที่แอปจงจดได้เลย)</div>
       </div>
       <input type="file" id="slipInput" accept="image/*" multiple style="display:none" onchange="handleSlips(this.files)">
       <button class="btn ghost" style="margin-top:10px" onclick="document.getElementById('slipCam').click()">📷 ถ่ายรูปสลิปตอนนี้</button>
@@ -326,6 +326,20 @@
         <div id="recurList"></div>
       </div>
 
+      <div class="card" id="watchCard">
+        <div class="sec-title" style="margin-top:0">📁 สลิปเข้าอัตโนมัติ</div>
+        <div id="watchDesktop" style="display:none">
+          <div class="hint" style="margin:0 0 10px">เลือกโฟลเดอร์ที่สลิปถูกเซฟไว้ครั้งเดียว — เมื่อเปิดแอปทิ้งไว้ ระบบจะดึง<b>รูปใหม่</b>เข้าโปรแกรมให้เองทุก 1 นาที (รูปเดิมไม่ซ้ำ) แล้วค่อยไปแก้รายละเอียดเองได้</div>
+          <div class="hint" id="watchStatus" style="margin:0 0 10px"></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn" style="flex:1;margin:0" onclick="pickWatchFolder()">เลือกโฟลเดอร์</button>
+            <button class="btn ghost" style="flex:1;margin:0" onclick="stopWatchFolder()">หยุดติดตาม</button>
+          </div>
+        </div>
+        <div id="watchMobile" style="display:none" class="hint">
+          📱 บนมือถือ Android: ติดตั้งแอปลงหน้าจอโฮมก่อน จากนั้นเวลามีสลิปใหม่ เปิดแกลเลอรี → เลือกรูปสลิป (เลือกหลายรูปได้) → กด<b>แชร์</b> → เลือก <b>"จงจด"</b> — รูปจะเข้าโปรแกรมและอ่านให้อัตโนมัติทันที ไม่ต้องเปิดแอปมากดเลือกไฟล์เอง
+        </div>
+      </div>
       <div class="card">
         <div class="sec-title" style="margin-top:0">🔒 ล็อกแอปด้วย PIN</div>
         <div id="pinOffBox">
@@ -793,7 +807,7 @@ function switchView(v){
   const subs={home:'รายรับรายจ่ายของฉัน',list:'รายการทั้งหมด',slip:'อ่านสลิปด้วย AI',chat:'ผู้ช่วยจงจด',set:'ตั้งค่า'};
   $('topSub').textContent=subs[v]||'';
   if(v==='slip')updateSlipHint();
-  if(v==='set'){ loadSettingsForm(); try{ updateCloudUI(); renderRecurList(); updatePinUI(); populateVoiceSelect(); }catch(e){} }
+  if(v==='set'){ loadSettingsForm(); try{ updateCloudUI(); renderRecurList(); updatePinUI(); populateVoiceSelect(); updateWatchUI(); }catch(e){} }
 }
 function openStats(){
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
@@ -1511,6 +1525,96 @@ async function sendChat(){
   }
 }
 
+/* ================= สลิปอัตโนมัติ: เฝ้าโฟลเดอร์ (คอม) + รับแชร์ (มือถือ) ================= */
+const idb={
+  _db:null,
+  open(){ return new Promise((res,rej)=>{ if(idb._db)return res(idb._db); const r=indexedDB.open('jongjod',1); r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>{idb._db=r.result;res(idb._db)}; r.onerror=()=>rej(r.error); }); },
+  async get(k){ try{ const db=await idb.open(); return new Promise(res=>{ const t=db.transaction('kv').objectStore('kv').get(k); t.onsuccess=()=>res(t.result); t.onerror=()=>res(null); }); }catch(e){ return null; } },
+  async set(k,v){ try{ const db=await idb.open(); return new Promise(res=>{ const t=db.transaction('kv','readwrite'); t.objectStore('kv').put(v,k); t.oncomplete=()=>res(true); t.onerror=()=>res(false); }); }catch(e){ return false; } },
+  async del(k){ try{ const db=await idb.open(); return new Promise(res=>{ const t=db.transaction('kv','readwrite'); t.objectStore('kv').delete(k); t.oncomplete=()=>res(true); t.onerror=()=>res(false); }); }catch(e){ return false; } }
+};
+let watchHandle=null;
+let watchSeen=store.get('jd_watchseen',[]);
+async function initWatch(){
+  try{ watchHandle=await idb.get('watchDir')||null; }catch(e){}
+  updateWatchUI();
+  if(watchHandle) setTimeout(()=>scanWatchFolder(),3000);
+}
+function updateWatchUI(){
+  const card=$('watchCard'); if(!card)return;
+  const desktop='showDirectoryPicker' in window;
+  $('watchDesktop').style.display=desktop?'block':'none';
+  $('watchMobile').style.display=desktop?'none':'block';
+  const st=$('watchStatus'); if(!st)return;
+  st.innerHTML = watchHandle ? ('✅ กำลังติดตามโฟลเดอร์: <b>'+escapeHtml(watchHandle.name)+'</b> — ดึงรูปใหม่อัตโนมัติตอนแอปเปิดอยู่' ) : 'ยังไม่ได้เลือกโฟลเดอร์';
+}
+async function pickWatchFolder(){
+  if(!('showDirectoryPicker' in window)){ toast('ฟีเจอร์นี้ใช้ได้บน Chrome/Edge บนคอม'); return; }
+  try{
+    const h=await showDirectoryPicker({mode:'read'});
+    watchHandle=h; await idb.set('watchDir',h);
+    updateWatchUI(); toast('เริ่มติดตามโฟลเดอร์ "'+h.name+'" ✓');
+    scanWatchFolder();
+  }catch(e){ if(e&&e.name!=='AbortError') toast('เลือกโฟลเดอร์ไม่สำเร็จ'); }
+}
+async function stopWatchFolder(){
+  watchHandle=null; await idb.del('watchDir'); updateWatchUI(); toast('หยุดติดตามแล้ว');
+}
+async function regrantWatch(){
+  try{ const p=await watchHandle.requestPermission({mode:'read'}); if(p==='granted'){ updateWatchUI(); scanWatchFolder(); } }catch(e){}
+}
+let watchScanning=false;
+async function scanWatchFolder(){
+  if(!watchHandle||watchScanning||!hasKey())return;
+  watchScanning=true;
+  try{
+    let perm=await watchHandle.queryPermission({mode:'read'});
+    if(perm==='prompt'){
+      const st=$('watchStatus');
+      if(st) st.innerHTML='⚠️ เบราว์เซอร์ขอให้ยืนยันสิทธิ์อีกครั้ง — <a style="text-decoration:underline;cursor:pointer" onclick="regrantWatch()">กดที่นี่เพื่ออนุญาต</a>';
+      watchScanning=false; return;
+    }
+    if(perm!=='granted'){ watchScanning=false; return; }
+    const news=[];
+    for await (const entry of watchHandle.values()){
+      if(entry.kind!=='file')continue;
+      if(!/\.(jpe?g|png|webp)$/i.test(entry.name))continue;
+      if(watchSeen.includes(entry.name))continue;
+      try{ news.push({name:entry.name, file:await entry.getFile()}); }catch(e){}
+      if(news.length>=10)break; // ทีละชุด กันหนักเกิน
+    }
+    if(news.length){
+      news.forEach(n=>watchSeen.push(n.name));
+      watchSeen=watchSeen.slice(-5000); store.set('jd_watchseen',watchSeen);
+      toast('📁 พบสลิปใหม่ '+news.length+' รูป กำลังอ่านเข้าโปรแกรม...');
+      await handleSlips(news.map(n=>n.file));
+    }
+  }catch(e){}
+  watchScanning=false;
+}
+setInterval(()=>scanWatchFolder(),60000);
+
+async function intakeSharedImages(){
+  if(!/[?&]shared=1/.test(location.search))return;
+  try{ history.replaceState(null,'',location.pathname); }catch(e){}
+  try{
+    const cache=await caches.open('jd-share');
+    const keys=await cache.keys();
+    if(!keys.length)return;
+    const files=[];
+    for(const req of keys){
+      const res=await cache.match(req);
+      if(res){ const blob=await res.blob(); files.push(new File([blob],'shared-'+files.length+'.jpg',{type:blob.type||'image/jpeg'})); }
+      await cache.delete(req);
+    }
+    if(files.length){
+      switchView('slip');
+      toast('📲 รับรูปที่แชร์มา '+files.length+' รูป กำลังอ่าน...');
+      await handleSlips(files);
+    }
+  }catch(e){}
+}
+
 /* ================= Cloud sync (Supabase) ================= */
 let cloud = store.get('jd_cloud',{url:'',key:'',email:'',access:'',refresh:'',uid:''});
 const EMBEDDED_CLOUD={url:'https://gkfydpghquvdprceztbp.supabase.co',key:'sb_publishable_e858BuxJJj_cbJucAXZGZQ_Uk3F7CcF'};
@@ -1668,6 +1772,8 @@ updateSlipHint();
 updateCloudUI();
 updatePinUI();
 syncNow(false);
+initWatch();
+intakeSharedImages();
 showLock();
 
 /* ================= PWA ================= */
