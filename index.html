@@ -533,6 +533,12 @@
   </div>
   <span class="mini" onclick="hideAuthGate()">ข้ามไปก่อน (ใช้เฉพาะเครื่องนี้)</span>
 </div>
+<!-- ตัวดูรูปสลิป -->
+<div id="imgViewer" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:300;align-items:center;justify-content:center;padding:16px" onclick="closeImgViewer(event)">
+  <img id="imgViewerImg" style="max-width:100%;max-height:100%;border-radius:12px;display:none">
+  <div id="imgViewerLoad" style="position:absolute;color:#fff;font-size:14px"><span class="spin" style="border-top-color:#fff"></span> กำลังโหลดรูป...</div>
+  <button onclick="closeImgViewer()" style="position:absolute;top:calc(env(safe-area-inset-top) + 14px);right:16px;width:42px;height:42px;border-radius:50%;border:none;background:rgba(255,255,255,.18);color:#fff;font-size:22px;cursor:pointer">×</button>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -688,7 +694,7 @@ function txRow(t){
   if(t.tr)badges.push('<span class="badge">โอน</span>');
   if(t.by)badges.push(`<span class="badge">👤 ${escapeHtml(t.by)}</span>`);
   (t.tags||[]).forEach(tag=>badges.push(`<span class="badge tag" data-tag="${escapeHtml(tag)}">#${escapeHtml(tag)}</span>`));
-  if(t.img)badges.push('<span class="badge">📎</span>');
+  if(t.img)badges.push('<span class="badge slipbtn" data-imgpath="'+escapeHtml(t.img)+'">📎 ดูสลิป</span>');
   if(t.source==='ai')badges.push('<span class="badge">AI</span>');
   if(t.source==='slip')badges.push('<span class="badge">สลิป</span>');
   if(t.source==='recur')badges.push('<span class="badge">ประจำ</span>');
@@ -701,6 +707,7 @@ function txRow(t){
     </div>
     <div class="amt ${t.type==='expense'?'exp':'inc'}">${t.type==='expense'?'-':'+'}${fmt(t.amount).replace('-','')}</div>`;
   row.querySelectorAll('.badge.tag').forEach(b=>{ b.onclick=(e)=>{ e.stopPropagation(); filterByTag(b.dataset.tag); }; });
+  row.querySelectorAll('.badge.slipbtn').forEach(b=>{ b.onclick=(e)=>{ e.stopPropagation(); openSlipViewer(b.dataset.imgpath); }; });
   return row;
 }
 
@@ -1344,19 +1351,35 @@ async function uploadSlipImg(txid,img){
     return res.ok ? path : null;
   }catch(e){ return null; }
 }
-async function viewSlipImg(){
-  if(!form.viewImg){ toast('ไม่มีรูปแนบ'); return; }
-  try{
-    const res=await fetch(cloud.url+'/storage/v1/object/sign/slips/'+form.viewImg,{
-      method:'POST',
-      headers:{'apikey':cloud.key,'authorization':'Bearer '+cloud.access,'content-type':'application/json'},
-      body:JSON.stringify({expiresIn:3600})
-    });
-    const j=await res.json();
-    if(j.signedURL||j.signedUrl){ window.open(cloud.url+'/storage/v1'+(j.signedURL||j.signedUrl),'_blank'); }
-    else toast('เปิดรูปไม่ได้ — ลองซิงก์แล้วลองใหม่');
-  }catch(e){ toast('เปิดรูปไม่ได้: ออฟไลน์อยู่'); }
+async function getSignedSlip(path,retry){
+  const res=await fetch(cloud.url+'/storage/v1/object/sign/slips/'+path,{
+    method:'POST',
+    headers:{'apikey':cloud.key,'authorization':'Bearer '+cloud.access,'content-type':'application/json'},
+    body:JSON.stringify({expiresIn:3600})
+  });
+  if(res.status===401 && retry!==false && await refreshToken()) return getSignedSlip(path,false);
+  const j=await res.json().catch(()=>({}));
+  const u=j.signedURL||j.signedUrl;
+  return u ? (cloud.url+'/storage/v1'+u) : null;
 }
+async function openSlipViewer(path){
+  if(!path){ toast('ไม่มีรูปแนบ'); return; }
+  if(!loggedIn()){ toast('ต้องล็อกอินก่อนถึงจะดูรูปสลิปได้'); return; }
+  const v=$('imgViewer'), img=$('imgViewerImg'), ld=$('imgViewerLoad');
+  v.style.display='flex'; img.style.display='none'; img.src=''; ld.style.display='block'; ld.innerHTML='<span class="spin" style="border-top-color:#fff"></span> กำลังโหลดรูป...';
+  try{
+    const url=await getSignedSlip(path);
+    if(!url) throw new Error('no url');
+    img.onload=()=>{ ld.style.display='none'; img.style.display='block'; };
+    img.onerror=()=>{ ld.textContent='เปิดรูปไม่ได้'; };
+    img.src=url;
+  }catch(e){ ld.textContent='เปิดรูปไม่ได้ — ลองกดซิงก์แล้วลองใหม่'; }
+}
+function closeImgViewer(ev){
+  if(ev && ev.target && ev.target.id==='imgViewerImg') return; // แตะที่รูปไม่ปิด
+  $('imgViewer').style.display='none'; $('imgViewerImg').src='';
+}
+function viewSlipImg(){ openSlipViewer(form.viewImg); }
 
 /* ================= Voice ================= */
 let voiceChain=false;
