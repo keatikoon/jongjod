@@ -1713,13 +1713,25 @@ async function initWatch(){
   updateWatchUI();
   if(watchHandle) setTimeout(()=>scanWatchFolder(),3000);
 }
+const isIOS = /iP(hone|od|ad)/.test(navigator.platform||'') || /iPhone|iPad|iPod/.test(navigator.userAgent||'') || ((navigator.userAgent||'').includes('Mac') && 'ontouchend' in document);
+function pickAlbumSlips(){ switchView('slip'); setTimeout(()=>{ const i=$('slipInput'); if(i)i.click(); },150); }
 function updateWatchUI(){
   const card=$('watchCard'); if(!card)return;
-  const desktop='showDirectoryPicker' in window;
+  const desktop='showDirectoryPicker' in window && !isIOS;
   $('watchDesktop').style.display=desktop?'block':'none';
   $('watchMobile').style.display=desktop?'none':'block';
-  const st=$('watchStatus'); if(!st)return;
-  st.innerHTML = watchHandle ? ('✅ กำลังติดตามโฟลเดอร์: <b>'+escapeHtml(watchHandle.name)+'</b> — ดึงรูปใหม่อัตโนมัติตอนแอปเปิดอยู่' ) : 'ยังไม่ได้เลือกโฟลเดอร์';
+  const st=$('watchStatus'); if(st) st.innerHTML = watchHandle ? ('✅ กำลังติดตามโฟลเดอร์: <b>'+escapeHtml(watchHandle.name)+'</b> — ดึงรูปใหม่อัตโนมัติตอนแอปเปิดอยู่' ) : 'ยังไม่ได้เลือกโฟลเดอร์';
+  const m=$('watchMobile'); if(m && !desktop){
+    if(isIOS){
+      m.innerHTML='<div style="font-weight:600;color:var(--txt);margin-bottom:6px">📱 สำหรับ iPhone / iPad</div>'
+        +'<div class="hint" style="margin:0 0 10px">iPhone ไม่อนุญาตให้เว็บแอปดึงรูปจากอัลบั้มเองอัตโนมัติ (ข้อจำกัดของ Apple) — วิธีที่เร็วที่สุดคือกดปุ่มด้านล่าง แล้วเลือกสลิป<b>ได้หลายใบพร้อมกัน</b> AI จะอ่านให้ทั้งหมด รูปเดิมที่เคยเพิ่มจะถูกข้ามอัตโนมัติ</div>'
+        +'<button class="btn" onclick="pickAlbumSlips()">📸 เลือกสลิปจากอัลบั้ม (เลือกได้หลายใบ)</button>';
+    }else{
+      m.innerHTML='<div style="font-weight:600;color:var(--txt);margin-bottom:6px">📱 สำหรับ Android</div>'
+        +'<div class="hint" style="margin:0 0 10px">วิธีที่ 1 (อัตโนมัติ): ติดตั้งแอปลงหน้าจอโฮมก่อน จากนั้นเปิดแกลเลอรี → เลือกสลิป → กด<b>แชร์</b> → เลือก <b>"จงจด"</b> รูปจะเข้าและอ่านให้ทันที<br>วิธีที่ 2: กดปุ่มด้านล่างเพื่อเลือกจากอัลบั้มทีเดียวหลายใบ</div>'
+        +'<button class="btn" onclick="pickAlbumSlips()">📸 เลือกสลิปจากอัลบั้ม (เลือกได้หลายใบ)</button>';
+    }
+  }
 }
 async function pickWatchFolder(){
   if(!('showDirectoryPicker' in window)){ toast('ฟีเจอร์นี้ใช้ได้บน Chrome/Edge บนคอม'); return; }
