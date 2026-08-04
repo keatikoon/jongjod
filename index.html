@@ -519,6 +519,20 @@
   <span class="mini" onclick="forgotPin()">ลืม PIN?</span>
 </div>
 
+<!-- Login gate (หน้าแรก) -->
+<div class="pinlock" id="authGate">
+  <img id="gateLogo" alt="">
+  <h2>จงจด</h2>
+  <div style="font-size:13px;color:var(--muted);margin-top:-8px;text-align:center;line-height:1.6">เข้าสู่ระบบเพื่อซิงก์ข้อมูลร่วมกัน<br>ใช้อีเมล+รหัสผ่านเดียวกันทุกคนในครอบครัว</div>
+  <input id="gEmail" type="email" autocomplete="username" placeholder="อีเมล" style="max-width:290px;text-align:left;letter-spacing:0;font-size:15px">
+  <input id="gPass" type="password" autocomplete="current-password" placeholder="รหัสผ่าน" style="max-width:290px;text-align:left;letter-spacing:0;font-size:15px" onkeydown="if(event.key==='Enter')gateLogin()">
+  <div id="gErr" style="color:var(--red);font-size:12.5px;min-height:15px;text-align:center;max-width:290px"></div>
+  <div style="display:flex;gap:8px;max-width:290px;width:100%">
+    <button class="btn" style="flex:1" onclick="gateLogin()">เข้าสู่ระบบ</button>
+    <button class="btn ghost" style="flex:1" onclick="gateSignup()">สมัครใหม่</button>
+  </div>
+  <span class="mini" onclick="hideAuthGate()">ข้ามไปก่อน (ใช้เฉพาะเครื่องนี้)</span>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1735,13 +1749,38 @@ async function cloudLogin(){
     onAuthed(email,j); toast('เข้าสู่ระบบแล้ว ✓');
   }catch(e){ toast('เข้าสู่ระบบไม่สำเร็จ: '+e.message); }
 }
+function showAuthGate(){
+  if(!cloudReady())return;            // ยังไม่ตั้งเซิร์ฟเวอร์ → ไม่ต้องบังคับ
+  if(loggedIn())return;               // ล็อกอินอยู่แล้ว → เข้าเลย
+  const g=$('authGate'); if(!g)return;
+  if(cloud.email) $('gEmail').value=cloud.email;
+  g.classList.add('show');
+  setTimeout(()=>$('gEmail').focus(),200);
+}
+function hideAuthGate(){ const g=$('authGate'); if(g)g.classList.remove('show'); }
+async function gateLogin(){
+  const email=$('gEmail').value.trim(), pass=$('gPass').value;
+  $('gErr').textContent='';
+  if(!email||!pass){ $('gErr').textContent='กรอกอีเมลและรหัสผ่าน'; return; }
+  try{ const j=await supaAuth('token?grant_type=password',{email,password:pass}); onAuthed(email,j); toast('เข้าสู่ระบบแล้ว ✓'); }
+  catch(e){ $('gErr').textContent='เข้าสู่ระบบไม่สำเร็จ — อีเมลหรือรหัสผ่านไม่ถูกต้อง'; }
+}
+async function gateSignup(){
+  const email=$('gEmail').value.trim(), pass=$('gPass').value;
+  $('gErr').textContent='';
+  if(!email||pass.length<6){ $('gErr').textContent='กรอกอีเมล และรหัสผ่านอย่างน้อย 6 ตัว'; return; }
+  try{ const j=await supaAuth('signup',{email,password:pass});
+    if(j.access_token){ onAuthed(email,j); toast('สมัครและเข้าสู่ระบบแล้ว ✓'); }
+    else $('gErr').textContent='สมัครแล้ว — ถ้ามีอีเมลยืนยัน ให้กดยืนยันก่อนแล้วเข้าสู่ระบบ';
+  }catch(e){ $('gErr').textContent='สมัครไม่สำเร็จ: '+e.message; }
+}
 function onAuthed(email,j){
   cloud.email=email; cloud.access=j.access_token; cloud.refresh=j.refresh_token||''; cloud.uid=(j.user&&j.user.id)||'';
-  saveCloud(); updateCloudUI(); $('cPass').value='';
+  saveCloud(); updateCloudUI(); $('cPass').value=''; hideAuthGate();
   syncNow(false);
 }
 function cloudLogout(){
-  cloud.access=''; cloud.refresh=''; cloud.uid=''; saveCloud(); updateCloudUI(); toast('ออกจากระบบแล้ว');
+  cloud.access=''; cloud.refresh=''; cloud.uid=''; saveCloud(); updateCloudUI(); toast('ออกจากระบบแล้ว'); showAuthGate();
 }
 function mergeRemote(doc){
   if(!doc) return;
@@ -1824,6 +1863,7 @@ updatePinUI();
 syncNow(false);
 initWatch();
 intakeSharedImages();
+showAuthGate();
 showLock();
 
 /* ================= PWA ================= */
@@ -1840,6 +1880,7 @@ function iconDataURI(size){ return APP_ICONS[size]||APP_ICONS[192]; }
   const fav=document.createElement('link'); fav.rel='icon'; fav.href=iconDataURI(192); document.head.appendChild(fav);
   const bl=document.getElementById('brandLogo'); if(bl) bl.src=iconDataURI(192);
   const pl=document.getElementById('pinLogo'); if(pl) pl.src=iconDataURI(192);
+  const gl=document.getElementById('gateLogo'); if(gl) gl.src=iconDataURI(192);
   if('serviceWorker' in navigator){
     if(/^https?:$/.test(location.protocol)){
       navigator.serviceWorker.register('./sw.js').catch(()=>{});
