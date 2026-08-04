@@ -1143,8 +1143,8 @@ async function callOpenAI(messages,system,images){
     last.content=content;
   }
   const model=settings.model||DEFAULT_MODELS.openai;
-  const body={model,max_completion_tokens:4096,messages:msgs};
-  if(/^(gpt-5|o\d)/.test(model)) body.reasoning_effort='low'; // ฉลาดขึ้น ยังเร็ว
+  const body={model,max_completion_tokens:(images&&images.length)?1200:700,messages:msgs};
+  if(/^(gpt-5|o\d)/.test(model)) body.reasoning_effort='none'; // ตอบไวสุด ไม่ต้องคิดนาน
   const doFetch=(bd)=>fetch('https://api.openai.com/v1/chat/completions',{
     method:'POST',
     headers:{'content-type':'application/json','authorization':'Bearer '+settings.key},
@@ -1396,7 +1396,7 @@ function deviceSpeak(t,name){
       const vs=thaiVoices();
       const v=(name&&vs.find(x=>x.name===name))||vs[0];
       if(v) u.voice=v;
-      u.rate=1; u.pitch=1.1; u.onend=()=>res(); u.onerror=()=>res();
+      u.rate=1.08; u.pitch=1.1; u.onend=()=>res(); u.onerror=()=>res();
       speechSynthesis.speak(u);
       setTimeout(res, Math.min(20000, 2000+t.length*120));
     }catch(e){ res(); }
@@ -1406,7 +1406,7 @@ async function aiSpeak(t,voice){
   const res=await fetch('https://api.openai.com/v1/audio/speech',{
     method:'POST',
     headers:{'content-type':'application/json','authorization':'Bearer '+settings.key},
-    body:JSON.stringify({model:'gpt-4o-mini-tts',voice:voice||'nova',input:t,response_format:'mp3'})
+    body:JSON.stringify({model:'gpt-4o-mini-tts',voice:voice||'nova',input:t,response_format:'mp3',speed:1.12})
   });
   if(!res.ok) throw new Error('tts http '+res.status);
   const blob=await res.blob();
@@ -1466,7 +1466,8 @@ function chatContext(){
 }
 const CHAT_SYSTEM=()=>`คุณคือ "น้องจด" ผู้ช่วยสาวจดรายรับรายจ่ายภาษาไทย ฉลาด เป็นกันเอง และกระชับ
 บุคลิกสำคัญมาก: คุณเป็นผู้หญิง ลงท้ายประโยคด้วย "ค่ะ" หรือ "นะคะ" เสมอ ห้ามใช้ "ครับ" เด็ดขาด
-คุณเก่งเรื่องการเงิน: วิเคราะห์การใช้จ่าย เปรียบเทียบกับงบ แนะนำการออมได้ ถ้าผู้ใช้ใช้จ่ายเกินงบให้เตือนอย่างน่ารักไม่จู้จี้
+สำคัญเรื่องความเร็ว: reply ต้องสั้นที่สุด 1 ประโยคสั้นๆพอ (เช่น "จดให้แล้วค่ะ กาแฟ 60") ไม่ต้องอธิบายยาว เพราะผู้ใช้ฟังเป็นเสียง
+คุณเก่งเรื่องการเงิน ถ้าถูกถามให้วิเคราะห์ค่อยตอบยาวได้ แต่ปกติตอบสั้นเข้าไว้
 ${chatContext()}
 
 เมื่อผู้ใช้บอกค่าใช้จ่ายหรือรายรับ ให้แยกออกเป็นรายการ และตอบกลับเป็น JSON เท่านั้น รูปแบบ:
