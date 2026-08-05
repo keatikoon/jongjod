@@ -13,20 +13,20 @@
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#f7f7f5; --card:#ffffff; --card2:#f0f0ee; --line:#e9e9e6;
-    --txt:#1a1a1a; --muted:#8e8e8a;
-    --acc:#1d3557; --accTxt:#ffffff; --accsoft:#e8eef5;
-    --green:#2f9e7d; --red:#c05f5f; --amber:#b98a3c;
-    --shadow:0 1px 3px rgba(20,20,20,.05);
-    --shadow2:0 8px 28px rgba(20,20,20,.1);
+    --bg:#f1f6fc; --card:#ffffff; --card2:#e9f1fb; --line:#dbe7f5;
+    --txt:#16233d; --muted:#8194ad;
+    --acc:#0ea5e9; --accTxt:#ffffff; --accsoft:#e0f2fe;
+    --green:#10b981; --red:#f43f5e; --amber:#f59e0b;
+    --shadow:0 2px 8px rgba(30,90,160,.06);
+    --shadow2:0 10px 30px rgba(30,90,160,.16);
   }
   body.dark{
-    --bg:#141414; --card:#1e1e1f; --card2:#2a2a2b; --line:#2c2c2e;
-    --txt:#f0f0ee; --muted:#909090;
-    --acc:#f0f0ee; --accTxt:#161616; --accsoft:#2a2a2b;
-    --green:#6fc7a3; --red:#d99090; --amber:#d0b060;
-    --shadow:0 1px 3px rgba(0,0,0,.3);
-    --shadow2:0 10px 30px rgba(0,0,0,.5);
+    --bg:#0d1220; --card:#171e30; --card2:#212b44; --line:#29344e;
+    --txt:#eef3fc; --muted:#8fa0bd;
+    --acc:#38bdf8; --accTxt:#06121f; --accsoft:#1e293b;
+    --green:#34d399; --red:#fb7185; --amber:#fbbf24;
+    --shadow:0 2px 8px rgba(0,0,0,.35);
+    --shadow2:0 12px 32px rgba(0,0,0,.55);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0;height:100%}
@@ -225,6 +225,11 @@
     <div class="view" id="listView">
       <div class="card" style="padding:12px">
         <input id="fSearch" type="search" placeholder="🔍 ค้นหา ชื่อ/โน้ต/แท็ก/จำนวน" oninput="renderList()" style="margin-bottom:8px">
+        <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center">
+          <span style="font-size:12.5px;color:var(--muted);white-space:nowrap">📅 รายวัน</span>
+          <input id="fDay" type="date" onchange="renderList()" style="flex:1">
+          <button class="btn ghost" style="width:auto;margin:0;padding:9px 12px;font-size:13px" onclick="clearDayFilter()">ล้าง</button>
+        </div>
         <div style="display:flex; gap:8px; margin-bottom:8px">
           <select id="filterType" onchange="renderList()" style="flex:1">
             <option value="all">ทั้งหมด</option>
@@ -239,6 +244,7 @@
           <select id="filterWallet" onchange="renderList()" style="flex:1"></select>
         </div>
       </div>
+      <div id="listTotal"></div>
       <div id="fullList"></div>
     </div>
 
@@ -587,35 +593,35 @@ const mem={};
 /* ================= Categories & Wallets ================= */
 const CATS = {
   expense:[
-    {id:'food',name:'อาหาร',emo:'🍜',color:'#c9a227'},
-    {id:'drink',name:'เครื่องดื่ม/กาแฟ',emo:'☕',color:'#b0876a'},
-    {id:'transport',name:'เดินทาง',emo:'🚗',color:'#7ba6bc'},
-    {id:'shopping',name:'ช้อปปิ้ง',emo:'🛍️',color:'#b287a8'},
-    {id:'bills',name:'บิล/ค่าน้ำไฟ',emo:'🧾',color:'#9b8fc0'},
-    {id:'rent',name:'ที่พัก/ค่าเช่า',emo:'🏢',color:'#7f9ba6'},
-    {id:'home',name:'ของใช้ในบ้าน',emo:'🏠',color:'#8da9c4'},
-    {id:'fun',name:'บันเทิง',emo:'🎬',color:'#c98b8b'},
-    {id:'travel',name:'ท่องเที่ยว',emo:'✈️',color:'#86b0a4'},
-    {id:'health',name:'สุขภาพ',emo:'💊',color:'#8fb996'},
-    {id:'beauty',name:'ความงาม',emo:'💄',color:'#c497a4'},
-    {id:'edu',name:'การศึกษา',emo:'📚',color:'#ad9c6b'},
-    {id:'family',name:'ครอบครัว/ลูก',emo:'🧸',color:'#c9a98b'},
-    {id:'pet',name:'สัตว์เลี้ยง',emo:'🐶',color:'#a68f7b'},
-    {id:'insure',name:'ประกัน/ภาษี',emo:'🛡️',color:'#8a97ab'},
-    {id:'debt',name:'ผ่อน/หนี้',emo:'💳',color:'#a88b9e'},
-    {id:'donate',name:'ทำบุญ/บริจาค',emo:'🙏',color:'#c2b280'},
-    {id:'other',name:'อื่นๆ',emo:'📦',color:'#a3a3a0'},
+    {id:'food',name:'อาหาร',emo:'🍜',color:'#f59e0b'},
+    {id:'drink',name:'เครื่องดื่ม/กาแฟ',emo:'☕',color:'#ea9010'},
+    {id:'transport',name:'เดินทาง',emo:'🚗',color:'#0ea5e9'},
+    {id:'shopping',name:'ช้อปปิ้ง',emo:'🛍️',color:'#ec4899'},
+    {id:'bills',name:'บิล/ค่าน้ำไฟ',emo:'🧾',color:'#8b5cf6'},
+    {id:'rent',name:'ที่พัก/ค่าเช่า',emo:'🏢',color:'#6366f1'},
+    {id:'home',name:'ของใช้ในบ้าน',emo:'🏠',color:'#3b82f6'},
+    {id:'fun',name:'บันเทิง',emo:'🎬',color:'#f43f5e'},
+    {id:'travel',name:'ท่องเที่ยว',emo:'✈️',color:'#14b8a6'},
+    {id:'health',name:'สุขภาพ',emo:'💊',color:'#22c55e'},
+    {id:'beauty',name:'ความงาม',emo:'💄',color:'#e11d48'},
+    {id:'edu',name:'การศึกษา',emo:'📚',color:'#eab308'},
+    {id:'family',name:'ครอบครัว/ลูก',emo:'🧸',color:'#fb923c'},
+    {id:'pet',name:'สัตว์เลี้ยง',emo:'🐶',color:'#b45309'},
+    {id:'insure',name:'ประกัน/ภาษี',emo:'🛡️',color:'#64748b'},
+    {id:'debt',name:'ผ่อน/หนี้',emo:'💳',color:'#a855f7'},
+    {id:'donate',name:'ทำบุญ/บริจาค',emo:'🙏',color:'#f59e0b'},
+    {id:'other',name:'อื่นๆ',emo:'📦',color:'#94a3b8'},
   ],
   income:[
-    {id:'salary',name:'เงินเดือน',emo:'💰',color:'#8fb996'},
-    {id:'bonus',name:'โบนัส',emo:'🎁',color:'#c9a227'},
-    {id:'freelance',name:'ฟรีแลนซ์',emo:'💻',color:'#7ba6bc'},
-    {id:'sell',name:'ขายของ/ธุรกิจ',emo:'🏪',color:'#b0876a'},
-    {id:'invest',name:'ลงทุน/ปันผล',emo:'📈',color:'#9b8fc0'},
-    {id:'interest',name:'ดอกเบี้ย',emo:'🏦',color:'#7f9ba6'},
-    {id:'gift',name:'ได้รับ/ของขวัญ',emo:'🧧',color:'#c98b8b'},
-    {id:'refund',name:'เงินคืน',emo:'🔄',color:'#86b0a4'},
-    {id:'other_inc',name:'อื่นๆ',emo:'✨',color:'#a3a3a0'},
+    {id:'salary',name:'เงินเดือน',emo:'💰',color:'#22c55e'},
+    {id:'bonus',name:'โบนัส',emo:'🎁',color:'#f59e0b'},
+    {id:'freelance',name:'ฟรีแลนซ์',emo:'💻',color:'#0ea5e9'},
+    {id:'sell',name:'ขายของ/ธุรกิจ',emo:'🏪',color:'#ea9010'},
+    {id:'invest',name:'ลงทุน/ปันผล',emo:'📈',color:'#8b5cf6'},
+    {id:'interest',name:'ดอกเบี้ย',emo:'🏦',color:'#6366f1'},
+    {id:'gift',name:'ได้รับ/ของขวัญ',emo:'🧧',color:'#f43f5e'},
+    {id:'refund',name:'เงินคืน',emo:'🔄',color:'#14b8a6'},
+    {id:'other_inc',name:'อื่นๆ',emo:'✨',color:'#94a3b8'},
   ]
 };
 function catOf(type,id){ return (CATS[type]||[]).find(c=>c.id===id) || {id:'other',name:'อื่นๆ',emo:'📦',color:'#a3a3a0'}; }
@@ -746,6 +752,7 @@ function txRow(t){
   return row;
 }
 
+function clearDayFilter(){ if($('fDay'))$('fDay').value=''; renderList(); }
 function filterByTag(tag){
   switchView('list'); renderList();
   const ftag=$('filterTag');
@@ -771,7 +778,8 @@ function renderList(){
 
   const ft=$('filterType').value, fcat=fc.value, ftag=ftg.value, fby2=fby.value, fwal=fw.value;
   const q=($('fSearch').value||'').trim().toLowerCase();
-  let list=monthTxs();
+  const day=$('fDay')?$('fDay').value:'';
+  let list = day ? txs.filter(t=>t.date===day).sort((a,b)=>b.id.localeCompare(a.id)) : monthTxs();
   if(ft!=='all')list=list.filter(t=>t.type===ft);
   if(fcat&&fcat!=='all')list=list.filter(t=>t.cat===fcat);
   if(ftag&&ftag!=='all')list=list.filter(t=>(t.tags||[]).includes(ftag));
@@ -782,6 +790,11 @@ function renderList(){
     return (t.note||'').toLowerCase().includes(q) || c.name.toLowerCase().includes(q) ||
       (t.tags||[]).some(x=>x.toLowerCase().includes(q)) || String(t.amount).includes(q) || (t.by||'').toLowerCase().includes(q);
   });
+  let tInc=0,tExp=0; list.forEach(t=>{ if(t.tr)return; if(t.type==='income')tInc+=t.amount; else tExp+=t.amount; });
+  const lt=$('listTotal');
+  if(lt){ lt.innerHTML = list.length
+    ? `<div class="card" style="padding:12px 15px;display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font-size:12.5px;color:var(--muted)">${day?('📅 '+thDate(day)):'รวมที่กรอง'} · ${list.length} รายการ</span><span style="font-weight:700;white-space:nowrap"><span style="color:var(--red)">-${fmt(tExp).replace('฿','฿')}</span> &nbsp; <span style="color:var(--green)">+${fmt(tInc).replace('-','').replace('฿','฿')}</span></span></div>`
+    : ''; }
   const el=$('fullList'); el.innerHTML='';
   if(!list.length){ el.innerHTML=`<div class="empty"><div class="e">🔍</div>ไม่มีรายการตามที่กรอง</div>`; return; }
   let lastDate='';
