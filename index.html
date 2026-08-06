@@ -572,7 +572,7 @@
     <button class="btn" style="flex:1" onclick="gateLogin()">เข้าสู่ระบบ</button>
     <button class="btn ghost" style="flex:1" onclick="gateSignup()">สมัครใหม่</button>
   </div>
-  <span class="mini" onclick="hideAuthGate()">ข้ามไปก่อน (ใช้เฉพาะเครื่องนี้)</span>
+  <span class="mini" onclick="gateSkip()">ข้ามไปก่อน (ใช้เฉพาะเครื่องนี้)</span>
 </div>
 <!-- ตัวดูรูปสลิป -->
 <div id="imgViewer" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:300;align-items:center;justify-content:center;padding:16px" onclick="closeImgViewer(event)">
@@ -1892,12 +1892,14 @@ async function cloudLogin(){
 function showAuthGate(){
   if(!cloudReady())return;            // ยังไม่ตั้งเซิร์ฟเวอร์ → ไม่ต้องบังคับ
   if(loggedIn())return;               // ล็อกอินอยู่แล้ว → เข้าเลย
+  try{ if(localStorage.getItem('jd_localmode')==='1') return; }catch(e){}  // เคยเลือก "ใช้เครื่องนี้" → ไม่ต้องเด้งล็อกอินซ้ำ
   const g=$('authGate'); if(!g)return;
   if(cloud.email) $('gEmail').value=cloud.email;
   g.classList.add('show');
   setTimeout(()=>$('gEmail').focus(),200);
 }
 function hideAuthGate(){ const g=$('authGate'); if(g)g.classList.remove('show'); }
+function gateSkip(){ try{ localStorage.setItem('jd_localmode','1'); }catch(e){} hideAuthGate(); }
 async function gateLogin(){
   const email=$('gEmail').value.trim(), pass=$('gPass').value;
   $('gErr').textContent='';
@@ -1917,10 +1919,11 @@ async function gateSignup(){
 function onAuthed(email,j){
   cloud.email=email; cloud.access=j.access_token; cloud.refresh=j.refresh_token||''; cloud.uid=(j.user&&j.user.id)||'';
   saveCloud(); updateCloudUI(); $('cPass').value=''; hideAuthGate();
+  try{ localStorage.removeItem('jd_localmode'); }catch(e){}   // ล็อกอินแล้ว → กลับเป็นโหมดคลาวด์
   syncNow(false);
 }
 function cloudLogout(){
-  cloud.access=''; cloud.refresh=''; cloud.uid=''; saveCloud(); updateCloudUI(); toast('ออกจากระบบแล้ว'); showAuthGate();
+  cloud.access=''; cloud.refresh=''; cloud.uid=''; saveCloud(); updateCloudUI(); toast('ออกจากระบบแล้ว'); try{ localStorage.removeItem('jd_localmode'); }catch(e){} showAuthGate();
 }
 function mergeRemote(doc){
   if(!doc) return;

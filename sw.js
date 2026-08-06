@@ -1,5 +1,5 @@
 // จงจด service worker — ออฟไลน์ + รับรูปที่แชร์เข้าแอป (Android share target)
-const CACHE = 'jongjod-v21';
+const CACHE = 'jongjod-v22';
 self.addEventListener('install', e => {
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./'])));
